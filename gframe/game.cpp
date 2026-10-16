@@ -691,6 +691,8 @@ bool Game::Initialize() {
 	btnShuffleDeck = env->addButton(irr::core::rect<irr::s32>(5, 99, 55, 120), wDeckEdit, BUTTON_SHUFFLE_DECK, dataManager.GetSysString(1307));
 	btnSortDeck = env->addButton(irr::core::rect<irr::s32>(60, 99, 110, 120), wDeckEdit, BUTTON_SORT_DECK, dataManager.GetSysString(1305));
 	btnClearDeck = env->addButton(irr::core::rect<irr::s32>(115, 99, 165, 120), wDeckEdit, BUTTON_CLEAR_DECK, dataManager.GetSysString(1304));
+	btnExportDeckCodeQuick = env->addButton(irr::core::rect<irr::s32>(170, 99, 220, 120), wDeckEdit, BUTTON_EXPORT_DECK_CODE, dataManager.GetSysString(1489));
+	btnExportDeckCodeQuick->setToolTipText(dataManager.GetSysString(1479));
 	btnSideOK = env->addButton(irr::core::rect<irr::s32>(400, 40, 710, 80), 0, BUTTON_SIDE_OK, dataManager.GetSysString(1334));
 	btnSideOK->setVisible(false);
 	btnSideShuffle = env->addButton(irr::core::rect<irr::s32>(310, 100, 370, 130), 0, BUTTON_SHUFFLE_DECK, dataManager.GetSysString(1307));
@@ -1881,6 +1883,7 @@ void Game::OnResize() {
 	wDeckEdit->setRelativePosition(Resize(309, 5, 605, 130));
 	cbDBDecks->setRelativePosition(Resize(80, 35, 220, 60));
 	btnClearDeck->setRelativePosition(Resize(115, 99, 165, 120));
+	btnExportDeckCodeQuick->setRelativePosition(Resize(170, 99, 220, 120));
 	btnSortDeck->setRelativePosition(Resize(60, 99, 110, 120));
 	btnShuffleDeck->setRelativePosition(Resize(5, 99, 55, 120));
 	btnSaveDeck->setRelativePosition(Resize(225, 35, 290, 60));

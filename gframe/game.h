@@ -540,6 +540,7 @@ public:
 	irr::gui::IGUIComboBox* cbDBDecks;
 	irr::gui::IGUIButton* btnManageDeck;
 	irr::gui::IGUIButton* btnClearDeck;
+	irr::gui::IGUIButton* btnExportDeckCodeQuick;
 	irr::gui::IGUIButton* btnSortDeck;
 	irr::gui::IGUIButton* btnShuffleDeck;
 	irr::gui::IGUIButton* btnSaveDeck;
