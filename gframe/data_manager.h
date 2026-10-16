@@ -21,19 +21,32 @@ constexpr uint32_t MIN_CARD_ID = (uint32_t)(MAX_STRING_ID + 1) >> 4;
 constexpr uint32_t MAX_CARD_ID = 0x0fffffffU;
 
 using CardData = card_data;
-struct CardDataC {
-	uint32_t code{};
-	uint32_t alias{};
-	uint16_t setcode[SIZE_SETCODE]{};
-	uint32_t type{};
-	uint32_t level{};
-	uint32_t attribute{};
-	uint32_t race{};
-	int32_t attack{};
-	int32_t defense{};
-	uint32_t lscale{};
-	uint32_t rscale{};
-	uint32_t link_marker{};
+
+inline bool is_alternative(uint32_t code, uint32_t alias) {
+	if (code == 5405695)
+		return false;
+	return alias && (alias < code + 20) && (code < alias + 20);
+}
+
+namespace detail {
+	template<typename T>
+	auto PrepareCardRuleCode(T& data, int) -> decltype(data.rule_code, void()) {
+		// Legacy databases use alias for both artwork and rule-name aliases.
+		data.rule_code = data.alias;
+		if (!is_alternative(data.code, data.alias))
+			data.alias = 0;
+	}
+	template<typename T>
+	void PrepareCardRuleCode(T&, long) {
+		// Older cores interpret the original alias field themselves.
+	}
+}
+
+inline void PrepareCardDataForCore(CardData& data) {
+	detail::PrepareCardRuleCode(data, 0);
+}
+
+struct CardDataC : CardData {
 	uint32_t ot{};
 	uint32_t category{};
 

@@ -1,6 +1,7 @@
 #include <array>
 #include "config.h"
 #include "deck_con.h"
+#include "deck_share.h"
 #include "myfilesystem.h"
 #include "image_manager.h"
 #include "sound_manager.h"
@@ -407,6 +408,23 @@ bool DeckBuilder::OnEvent(const irr::SEvent& event) {
 				mainGame->PopupElement(mainGame->wDMQuery);
 				mainGame->gMutex.unlock();
 				prev_operation = id;
+				break;
+			}
+			case BUTTON_EXPORT_DECK_LINK: {
+				DeckArray deck;
+				for (auto card : deckManager.current_deck.main)
+					deck.main.push_back(card->first);
+				for (auto card : deckManager.current_deck.extra)
+					deck.extra.push_back(card->first);
+				for (auto card : deckManager.current_deck.side)
+					deck.side.push_back(card->first);
+				char name[1024];
+				BufferIO::EncodeUTF8(mainGame->cbDBDecks->getText(), name);
+				const auto link = ExportDeckLink(deck, name);
+				const std::wstring text(link.begin(), link.end());
+				mainGame->env->getOSOperator()->copyToClipboard(text.c_str());
+				mainGame->stACMessage->setText(dataManager.GetSysString(1491));
+				mainGame->PopupElement(mainGame->wACMessage, 20);
 				break;
 			}
 			case BUTTON_EXPORT_DECK_CODE: {

@@ -178,7 +178,7 @@ bool DataManager::GetData(uint32_t code, CardData* pData) const {
 	if(cdit == _datas.end())
 		return false;
 	if (pData) {
-		std::memcpy(pData, &cdit->second, sizeof(CardData));
+		*pData = static_cast<const CardData&>(cdit->second);
 	}
 	return true;
 }
@@ -369,6 +369,8 @@ std::wstring DataManager::FormatLinkMarker(unsigned int link_marker) const {
 uint32_t DataManager::CardReader(uint32_t code, card_data* pData) {
 	if (!dataManager.GetData(code, pData))
 		pData->clear();
+	else
+		PrepareCardDataForCore(*pData);
 	return 0;
 }
 unsigned char* DataManager::ScriptReaderEx(const char* script_path, int* slen) {
