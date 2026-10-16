@@ -10,6 +10,8 @@
 
 namespace ygo {
 
+class ClientCard;
+
 class DuelClient {
 private:
 	static unsigned int connect_state;
@@ -45,6 +47,8 @@ public:
 	static int ClientThread();
 	static void HandleSTOCPacketLan(unsigned char* data, int len);
 	static bool ClientAnalyze(unsigned char* msg, int len);
+	static void ResolveGuessedHandConflict(int player, ClientCard* pcard, unsigned int code);
+	static void ForgetHandKnowledge(int player);
 	static void SwapField();
 	static void SetResponseI(int32_t respI);
 	static void SetResponseB(void* respB, size_t len);

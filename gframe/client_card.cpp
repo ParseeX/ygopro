@@ -1,5 +1,6 @@
 #include "client_card.h"
 #include "client_field.h"
+#include "duelclient.h"
 #include "game.h"
 
 namespace ygo {
@@ -31,7 +32,29 @@ ClientCard::~ClientCard() {
 	}
 	overlayed.clear();
 }
+bool ClientCard::IsMonster() {
+	if (code == 0) return false;
+	CardData cd;
+	if (!dataManager.GetData(code, &cd)) return false;
+	return (cd.type & TYPE_MONSTER) != 0;
+}
+bool ClientCard::IsMagicTrap() {
+	if (code == 0) return false;
+	CardData cd;
+	if (!dataManager.GetData(code, &cd)) return false;
+	return (cd.type & (TYPE_SPELL | TYPE_TRAP)) != 0;
+}
+bool ClientCard::IsField() {
+	if (code == 0) return false;
+	CardData cd;
+	if (!dataManager.GetData(code, &cd)) return false;
+	return (cd.type & TYPE_FIELD) != 0;
+}
 void ClientCard::SetCode(unsigned int x) {
+	if (!mainGame->dInfo.isReplay && code != 0 && x == 0) {
+		is_guessed = true;
+		return;
+	}
 	if((location == LOCATION_HAND) && (code != x)) {
 		code = x;
 		mainGame->dField.MoveCard(this, 5);
@@ -50,6 +73,10 @@ void ClientCard::UpdateInfo(unsigned char* buf) {
 	}
 	if(flag & QUERY_CODE) {
 		int pdata = BufferIO::Read<int32_t>(buf);
+		// Public refreshes can arrive before the reveal/flip message.
+		// Resolve while the previous guessed code is still available.
+		if (!mainGame->dInfo.isReplay && controler == 1 && (location == LOCATION_HAND || from_hand))
+			DuelClient::ResolveGuessedHandConflict(controler, this, pdata);
 		if (!pdata)
 			ClearData();
 		SetCode(pdata);

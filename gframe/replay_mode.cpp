@@ -871,7 +871,7 @@ void ReplayMode::ReplayRefresh(int flag) {
 	ReloadLocation(0, LOCATION_SZONE, flag, queryBuffer);
 	ReloadLocation(1, LOCATION_SZONE, flag, queryBuffer);
 	ReloadLocation(0, LOCATION_HAND, flag, queryBuffer);
-	ReloadLocation(1, LOCATION_HAND, flag, queryBuffer);
+	//ReloadLocation(1, LOCATION_HAND, flag, queryBuffer);
 }
 void ReplayMode::ReplayRefreshLocation(int player, int location, int flag) {
 	std::vector<unsigned char> queryBuffer;
@@ -904,7 +904,7 @@ void ReplayMode::ReplayReload() {
 	ReloadLocation(0, LOCATION_SZONE, flag, queryBuffer);
 	ReloadLocation(1, LOCATION_SZONE, flag, queryBuffer);
 	ReloadLocation(0, LOCATION_HAND, flag, queryBuffer);
-	ReloadLocation(1, LOCATION_HAND, flag, queryBuffer);
+	//ReloadLocation(1, LOCATION_HAND, flag, queryBuffer);
 
 	ReloadLocation(0, LOCATION_DECK, flag, queryBuffer);
 	ReloadLocation(1, LOCATION_DECK, flag, queryBuffer);

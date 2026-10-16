@@ -28,6 +28,8 @@ public:
 	bool is_showchaintarget{ false };
 	bool is_highlighting{ false };
 	bool is_reversed{ false };
+	bool is_guessed{ false };
+	bool from_hand{ false };
 
 	unsigned int code{ 0 };
 	unsigned int chain_code{ 0 };
@@ -79,6 +81,9 @@ public:
 	void UpdateInfo(unsigned char* buf);
 	void ClearTarget();
 	void ClearData();
+	bool IsMonster();
+	bool IsMagicTrap();
+	bool IsField();
 	static bool client_card_sort(ClientCard* c1, ClientCard* c2);
 };
 

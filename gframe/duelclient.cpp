@@ -951,6 +951,124 @@ void DuelClient::HandleSTOCPacketLan(unsigned char* data, int len) {
 	}
 	}
 }
+void DuelClient::ForgetHandKnowledge(int player) {
+	std::lock_guard<std::mutex> lock(mainGame->gMutex);
+	auto forget = [](ClientCard* card) {
+		// SetCode(0) intentionally retains remembered codes; invalidate directly.
+		card->code = 0;
+		card->chain_code = 0;
+		card->is_guessed = false;
+		card->from_hand = false;
+		card->is_hovered = false;
+		if (mainGame->dField.hovered_card == card) {
+			mainGame->ClearCardInfo(card->controler);
+			mainGame->stTip->setVisible(false);
+			mainGame->dField.hovered_card = nullptr;
+		}
+		mainGame->dField.MoveCard(card, 5);
+	};
+	for (auto card : mainGame->dField.hand[player])
+		forget(card);
+	// These guesses share the hand's memory pool and could otherwise migrate
+	// back into the hand on a later reveal. Keep confirmed field identities.
+	for (auto card : mainGame->dField.mzone[player]) {
+		if (card && card->from_hand && (card->is_guessed || card->code == 0))
+			forget(card);
+	}
+	for (auto card : mainGame->dField.szone[player]) {
+		if (card && card->from_hand && (card->is_guessed || card->code == 0))
+			forget(card);
+	}
+}
+void DuelClient::ResolveGuessedHandConflict(int player, ClientCard* pcard, unsigned int code) {
+	if (code == 0) return;
+	// 刚加手的
+	if (pcard->is_guessed && pcard->code == 0) {
+		pcard->is_guessed = false;
+		return;
+	}
+	if (!pcard->is_guessed && pcard->code == code) {
+		// 已知信息重复确认
+		return;
+	}
+
+	if (!(pcard->is_guessed && pcard->code == code)) {
+		bool found = false;
+		for (auto cit = mainGame->dField.hand[player].begin(); cit != mainGame->dField.hand[player].end(); ++cit) {
+			if ((*cit)->is_guessed && (*cit)->code == code) {
+				(*cit)->code = 0;
+				(*cit)->is_guessed = false;
+				(*cit)->curRot.X = 0.798056f;
+				(*cit)->curRot.Y = 3.1415926f;
+				(*cit)->curRot.Z = 0.0f;
+				(*cit)->mTransform.setRotationRadians((*cit)->curRot);
+				found = true;
+				break;
+			}
+		}
+		if (!found) {
+			for (auto card : mainGame->dField.mzone[player]) {
+				if (card && card->is_guessed && card->code == code) {
+					card->code = 0;
+					card->is_guessed = false;
+					found = true;
+					break;
+				}
+			}
+		}
+		if (!found) {
+			for (auto card : mainGame->dField.szone[player]) {
+				if (card && card->is_guessed && card->code == code) {
+					card->code = 0;
+					card->is_guessed = false;
+					found = true;
+					break;
+				}
+			}
+		}
+	}
+	if (pcard->is_guessed && pcard->code != code) {
+		bool found = false;
+		if (pcard->IsMonster()) {
+			for (auto card : mainGame->dField.mzone[player]) {
+				if (card && card->from_hand && !card->is_guessed && card->code == 0) {
+					card->code = pcard->code;
+					card->is_guessed = true;
+					found = true;
+					break;
+				}
+			}
+		} else {
+			for (auto card : mainGame->dField.szone[player]) {
+				if (card && card->from_hand && !card->is_guessed && card->code == 0) {
+					card->code = pcard->code;
+					card->is_guessed = true;
+					found = true;
+					break;
+				}
+			}
+		}
+		if (!found) {
+			for (auto cit = mainGame->dField.hand[player].begin(); cit != mainGame->dField.hand[player].end(); ++cit) {
+				if (!((*cit)->is_guessed) && (*cit)->code == 0) {
+					// 这个位置猜错了，换一个位置猜
+					(*cit)->code = pcard->code;
+					(*cit)->is_guessed = true;
+					(*cit)->curRot.X = -0.798056f;
+					(*cit)->curRot.Y = 0.0f;
+					(*cit)->curRot.Z = 0.0f;
+					(*cit)->mTransform.setRotationRadians((*cit)->curRot);
+					found = true;
+					break;
+				}
+			}
+		}
+		pcard->is_guessed = false;
+		pcard->code = 0;
+	}
+	pcard->is_guessed = false;
+	pcard->from_hand = false;
+}
 // Analyze STOC_GAME_MSG packet
 bool DuelClient::ClientAnalyze(unsigned char* msg, int len) {
 	unsigned char* pbuf = msg;
@@ -2189,6 +2307,8 @@ bool DuelClient::ClientAnalyze(unsigned char* msg, int len) {
 			l = BufferIO::Read<uint8_t>(pbuf);
 			s = BufferIO::Read<uint8_t>(pbuf);
 			pcard = mainGame->dField.GetCard(c, l, s);
+			if (!mainGame->dInfo.isReplay && c == 1 && (l == LOCATION_HAND || pcard->from_hand))
+				ResolveGuessedHandConflict(c, pcard, code);
 			if (code != 0)
 				pcard->SetCode(code);
 			mainGame->gMutex.lock();
@@ -2315,7 +2435,8 @@ bool DuelClient::ClientAnalyze(unsigned char* msg, int len) {
 			if(count > 1)
 				soundManager.PlaySoundEffect(SOUND_SHUFFLE);
 			mainGame->WaitFrameSignal(5);
-			if(player == 1 && !mainGame->dInfo.isReplay && !mainGame->dInfo.isSingleMode) {
+			// 修改：录像模式才把手牌翻过去
+			if(player == 1 && mainGame->dInfo.isReplay && !mainGame->dInfo.isSingleMode) {
 				bool flip = false;
 				for (auto cit = mainGame->dField.hand[player].begin(); cit != mainGame->dField.hand[player].end(); ++cit)
 					if((*cit)->code) {
@@ -2339,7 +2460,8 @@ bool DuelClient::ClientAnalyze(unsigned char* msg, int len) {
 			mainGame->WaitFrameSignal(11);
 		}
 		for(auto cit = mainGame->dField.hand[player].begin(); cit != mainGame->dField.hand[player].end(); ++cit) {
-			(*cit)->SetCode(BufferIO::Read<int32_t>(pbuf));
+			int32_t code = BufferIO::Read<int32_t>(pbuf);
+			(*cit)->SetCode(mainGame->dInfo.isReplay && player == 1 ? 0 : code);
 			(*cit)->desc_hints.clear();
 		}
 		if(!mainGame->dInfo.isReplay || !mainGame->dInfo.isReplaySkiping) {
@@ -2642,6 +2764,91 @@ bool DuelClient::ClientAnalyze(unsigned char* msg, int len) {
 		} else {
 			if (!(pl & LOCATION_OVERLAY) && !(cl & LOCATION_OVERLAY)) {
 				ClientCard* pcard = mainGame->dField.GetCard(pc, pl, ps);
+				// Capture uncertainty before resolving, swapping or removing this hand slot.
+				// A confirmed identity at this slot is sufficient even if the move hides its code.
+				const bool unknown_hand_return = !mainGame->dInfo.isReplay && pc == 1
+					&& pl == LOCATION_HAND && cl == LOCATION_DECK && code == 0
+					&& (pcard->code == 0 || pcard->is_guessed);
+				if (unknown_hand_return)
+					ForgetHandKnowledge(pc);
+				if (!mainGame->dInfo.isReplay && pc == 1 && (pl == LOCATION_HAND || pcard->from_hand))
+					ResolveGuessedHandConflict(pc, pcard, code);
+				// 某处加手，大概率之后要CONFIRM
+				// 不CONFIRM的情况：场上的卡回手
+				if (!mainGame->dInfo.isReplay && pc == 1 && cl == LOCATION_HAND){
+					if (pl & LOCATION_ONFIELD) pcard->from_hand = false;
+					else pcard->is_guessed = true;
+				}
+				// 手牌->场上，未知，优先明牌
+				if (!mainGame->dInfo.isReplay && pc == 1 && pl == LOCATION_HAND && (cl & LOCATION_ONFIELD) && code == 0) {
+					// 怪兽卡
+					if (cl == LOCATION_MZONE) {
+						for (auto cit = mainGame->dField.hand[pc].begin(); cit != mainGame->dField.hand[pc].end(); ++cit) {
+							if ((*cit)->is_guessed && (*cit)->IsMonster()) {
+								// 交换pcard和*cit的信息
+								std::swap(pcard->code, (*cit)->code);
+								std::swap(pcard->is_guessed, (*cit)->is_guessed);
+								break;
+							}
+						}
+						// 如果没有明牌就选一个暗牌
+						if (pcard->is_guessed && !pcard->IsMonster()) {
+							for (auto cit = mainGame->dField.hand[pc].begin(); cit != mainGame->dField.hand[pc].end(); ++cit) {
+								if (!(*cit)->is_guessed) {
+									// 交换pcard和*cit的信息
+									std::swap(pcard->code, (*cit)->code);
+									std::swap(pcard->is_guessed, (*cit)->is_guessed);
+									break;
+								}
+							}
+						}
+					}
+					else if (cs == 5) {
+						for (auto cit = mainGame->dField.hand[pc].begin(); cit != mainGame->dField.hand[pc].end(); ++cit) {
+							if ((*cit)->is_guessed && (*cit)->IsField()) {
+								// 交换pcard和*cit的信息
+								std::swap(pcard->code, (*cit)->code);
+								std::swap(pcard->is_guessed, (*cit)->is_guessed);
+								break;
+							}
+						}
+						// 如果没有明牌就选一个暗牌
+						if (pcard->is_guessed && !pcard->IsField()) {
+							for (auto cit = mainGame->dField.hand[pc].begin(); cit != mainGame->dField.hand[pc].end(); ++cit) {
+								if (!(*cit)->is_guessed) {
+									// 交换pcard和*cit的信息
+									std::swap(pcard->code, (*cit)->code);
+									std::swap(pcard->is_guessed, (*cit)->is_guessed);
+									break;
+								}
+							}
+						}
+					}
+					else {
+						for (auto cit = mainGame->dField.hand[pc].begin(); cit != mainGame->dField.hand[pc].end(); ++cit) {
+							if ((*cit)->is_guessed && (*cit)->IsMagicTrap() && !(*cit)->IsField()) {
+								// 交换pcard和*cit的信息
+								std::swap(pcard->code, (*cit)->code);
+								std::swap(pcard->is_guessed, (*cit)->is_guessed);
+								break;
+							}
+						}
+						// 如果没有明牌就选一个暗牌
+						if (pcard->is_guessed && (!pcard->IsMagicTrap() || pcard->IsField())) {
+							for (auto cit = mainGame->dField.hand[pc].begin(); cit != mainGame->dField.hand[pc].end(); ++cit) {
+								if (!(*cit)->is_guessed) {
+									// 交换pcard和*cit的信息
+									std::swap(pcard->code, (*cit)->code);
+									std::swap(pcard->is_guessed, (*cit)->is_guessed);
+									break;
+								}
+							}
+						}
+					}
+					pcard->from_hand = true;
+				}
+				// todo: 离场是否要清除标记？
+				// 打乱后不知道哪张牌from_hand，即洗切后场？或者洗切卡组时清除所有from_hand
 				if (pcard->code != code && (code != 0 || cl == 0x40))
 					pcard->SetCode(code);
 				pcard->cHint = 0;
@@ -2817,6 +3024,8 @@ bool DuelClient::ClientAnalyze(unsigned char* msg, int len) {
 			pcard->counters.clear();
 			pcard->ClearTarget();
 		}
+		if (!mainGame->dInfo.isReplay && cc == 1 && (cl == LOCATION_HAND || pcard->from_hand))
+			ResolveGuessedHandConflict(cc, pcard, code);
 		if (code != 0 && pcard->code != code)
 			pcard->SetCode(code);
 		pcard->position = cp;
@@ -2939,6 +3148,8 @@ bool DuelClient::ClientAnalyze(unsigned char* msg, int len) {
 		int cs = BufferIO::Read<uint8_t>(pbuf);
 		unsigned int cp = BufferIO::Read<uint8_t>(pbuf);
 		ClientCard* pcard = mainGame->dField.GetCard(cc, cl, cs);
+		if (!mainGame->dInfo.isReplay && cc == 1 && (cl == LOCATION_HAND || pcard->from_hand))
+			ResolveGuessedHandConflict(cc, pcard, code);
 		pcard->SetCode(code);
 		pcard->position = cp;
 		if(!mainGame->dInfo.isReplay || !mainGame->dInfo.isReplaySkiping) {
@@ -2975,6 +3186,11 @@ bool DuelClient::ClientAnalyze(unsigned char* msg, int len) {
 			return true;
 		soundManager.PlaySoundEffect(SOUND_ACTIVATE);
 		ClientCard* pcard = mainGame->dField.GetCard(pcc, pcl, pcs, subs);
+		// wchar_t textBuffer[32];
+		// myswprintf(textBuffer, L"发动了 %u, 此前记录为 %u", code, pcard->code);
+		// mainGame->AddLog(textBuffer);
+		if (!mainGame->dInfo.isReplay && pcc == 1 && (pcl == LOCATION_HAND || pcard->from_hand))
+			ResolveGuessedHandConflict(pcc, pcard, code);
 		if(pcard->code != code) {
 			pcard->code = code;
 			mainGame->dField.MoveCard(pcard, 10);
@@ -3150,8 +3366,14 @@ bool DuelClient::ClientAnalyze(unsigned char* msg, int len) {
 		for (int i = 0; i < count; ++i) {
 			unsigned int code = BufferIO::Read<int32_t>(pbuf);
 			pcard = mainGame->dField.GetCard(player, LOCATION_DECK, mainGame->dField.deck[player].size() - 1 - i);
-			if(!mainGame->dField.deck_reversed || code)
-				pcard->SetCode(code & 0x7fffffff);
+			if(!mainGame->dField.deck_reversed || code) {
+				// 在录像模式中，隐藏对手手牌
+				if(mainGame->dInfo.isReplay && player == 1) {
+					pcard->SetCode(0);  // 对手抽牌时设置为0（卡背）
+				} else {
+					pcard->SetCode(code & 0x7fffffff);  // 正常设置卡牌代码
+				}
+			}
 		}
 		if(mainGame->dInfo.isReplay && mainGame->dInfo.isReplaySkiping) {
 			for (int i = 0; i < count; ++i) {
