@@ -2435,21 +2435,6 @@ bool DuelClient::ClientAnalyze(unsigned char* msg, int len) {
 			if(count > 1)
 				soundManager.PlaySoundEffect(SOUND_SHUFFLE);
 			mainGame->WaitFrameSignal(5);
-			// 修改：录像模式才把手牌翻过去
-			if(player == 1 && mainGame->dInfo.isReplay && !mainGame->dInfo.isSingleMode) {
-				bool flip = false;
-				for (auto cit = mainGame->dField.hand[player].begin(); cit != mainGame->dField.hand[player].end(); ++cit)
-					if((*cit)->code) {
-						(*cit)->dPos = irr::core::vector3df(0, 0, 0);
-						(*cit)->dRot = irr::core::vector3df(1.322f / 5, 3.1415926f / 5, 0);
-						(*cit)->is_moving = true;
-						(*cit)->is_hovered = false;
-						(*cit)->aniFrame = 5;
-						flip = true;
-					}
-				if(flip)
-					mainGame->WaitFrameSignal(5);
-			}
 			for (auto cit = mainGame->dField.hand[player].begin(); cit != mainGame->dField.hand[player].end(); ++cit) {
 				(*cit)->dPos = irr::core::vector3df((3.9f - (*cit)->curPos.X) / 5, 0, 0);
 				(*cit)->dRot = irr::core::vector3df(0, 0, 0);
@@ -2461,7 +2446,7 @@ bool DuelClient::ClientAnalyze(unsigned char* msg, int len) {
 		}
 		for(auto cit = mainGame->dField.hand[player].begin(); cit != mainGame->dField.hand[player].end(); ++cit) {
 			int32_t code = BufferIO::Read<int32_t>(pbuf);
-			(*cit)->SetCode(mainGame->dInfo.isReplay && player == 1 ? 0 : code);
+			(*cit)->SetCode(code);
 			(*cit)->desc_hints.clear();
 		}
 		if(!mainGame->dInfo.isReplay || !mainGame->dInfo.isReplaySkiping) {
@@ -3366,14 +3351,8 @@ bool DuelClient::ClientAnalyze(unsigned char* msg, int len) {
 		for (int i = 0; i < count; ++i) {
 			unsigned int code = BufferIO::Read<int32_t>(pbuf);
 			pcard = mainGame->dField.GetCard(player, LOCATION_DECK, mainGame->dField.deck[player].size() - 1 - i);
-			if(!mainGame->dField.deck_reversed || code) {
-				// 在录像模式中，隐藏对手手牌
-				if(mainGame->dInfo.isReplay && player == 1) {
-					pcard->SetCode(0);  // 对手抽牌时设置为0（卡背）
-				} else {
-					pcard->SetCode(code & 0x7fffffff);  // 正常设置卡牌代码
-				}
-			}
+			if(!mainGame->dField.deck_reversed || code)
+				pcard->SetCode(code & 0x7fffffff);
 		}
 		if(mainGame->dInfo.isReplay && mainGame->dInfo.isReplaySkiping) {
 			for (int i = 0; i < count; ++i) {
