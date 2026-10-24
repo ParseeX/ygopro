@@ -115,6 +115,13 @@ class ReplayTests(unittest.TestCase):
         with self.assertRaisesRegex(ReplayError, "扩展头"):
             self.read_container(data)
 
+    def test_legacy_zero_extended_header_is_supported(self):
+        data = bytearray(self.container(extended=True))
+        struct.pack_into("<I", data, 64, 0)
+        replay = self.read_container(data)
+        self.assertEqual(replay.seeds, tuple(range(8)))
+        self.assertEqual(replay.responses, [b"\x01\0\0\0"])
+
     def timeline(self):
         replay = SimpleNamespace(players=["甲", "乙"], params=(8000, 5, 1, 0))
         content = SimpleNamespace(name=lambda n: f"卡{n}", description=lambda n: f"效果{n}")

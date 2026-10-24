@@ -66,7 +66,8 @@ class Replay:
         if magic == 0x32707279:
             seeds = r.unpack("8I")
             extension = r.unpack("4I")
-            if extension != (1, 0, 0, 0):
+            # 原版 OpenReplay 也接受旧服务器保留字段全零的扩展头。
+            if extension not in ((0, 0, 0, 0), (1, 0, 0, 0)):
                 raise ReplayError(f"不支持的 YRP2 扩展头：{extension}")
         body = r.take(r.remaining)
         if flags & 1:
