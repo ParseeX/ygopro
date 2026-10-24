@@ -63,3 +63,9 @@ Xyz materials:
 * deck: .ydk deck files.
 * replay: .yrp replay files.
 * expansions: *.cdb will be loaded as extra databases.
+
+### Replay text export
+
+Export native two-player YRP1/YRP2 recordings to a Chinese line-by-line duel log
+with a headless engine and diagnostic trace. See [the replay exporter guide](tools/replay_log/README.md)
+for building, matching historical card/script versions, and running regression checks.
