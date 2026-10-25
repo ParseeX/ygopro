@@ -182,6 +182,19 @@ class ReplayTests(unittest.TestCase):
         request = next(split_messages(bytes([25, 0, 1]) + struct.pack("<IBBB", 111, 0, 1, 0)))
         self.assertIn("不调整顺序", t.response(request, b"\xff\xff\xff\xff")[0])
 
+    def test_sort_ignores_bytes_beyond_option_count(self):
+        request = next(split_messages(bytes([25, 0, 2]) + struct.pack("<IBBBIBBB", 111, 0, 1, 0, 222, 0, 1, 1)))
+        for response, expected in ((b"\x01\x00\x01\x00", "卡222 → 卡111"),
+                                   (b"\x00\x01\x00\x01", "卡111 → 卡222")):
+            with self.subTest(response=response):
+                self.assertIn(expected, self.timeline().response(request, response)[0])
+
+    def test_sort_still_rejects_invalid_prefix(self):
+        request = next(split_messages(bytes([25, 0, 2]) + struct.pack("<IBBBIBBB", 111, 0, 1, 0, 222, 0, 1, 1)))
+        for response in (b"", b"\x00", b"\x00\x00\x01\x00", b"\x02\x00\x01\x00"):
+            with self.subTest(response=response), self.assertRaisesRegex(ReplayError, "排序响应不是完整排列"):
+                self.timeline().response(request, response)
+
     def test_legacy_core_preserves_rule_alias(self):
         card = CardData()
         card.code, card.rule_code, card.alias = 5405695, 89631139, 0

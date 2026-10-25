@@ -375,11 +375,13 @@ class Timeline:
             return [f"{actor}为 {self.content.name(r.u32())} 选择{POSITIONS.get(value, str(value))}"]
         if k == 25:
             options = entries(7)
-            if response[0] == 255:
+            if response and response[0] == 255:
                 return [f"{actor}不调整顺序"]
-            if len(response) != len(options) or sorted(response) != list(range(len(options))):
+            # 核心只读取选项数量个字节；部分录像保留了响应缓冲区的尾随字节。
+            order = response[:len(options)]
+            if len(order) != len(options) or sorted(order) != list(range(len(options))):
                 raise ReplayError("排序响应不是完整排列")
-            ordered = sorted(zip(response, options))
+            ordered = sorted(zip(order, options))
             return [f"{actor}排序：{' → '.join(entry_name(item) for _, item in ordered)}"]
         if k == 22:
             counter, total = r.unpack("HH")
